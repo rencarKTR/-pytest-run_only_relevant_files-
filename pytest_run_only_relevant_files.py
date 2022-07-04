@@ -24,6 +24,7 @@ collect_ignore_set: Set[str] = set()
 
 OPTION_SKIP_UNCHANGED_TESTS = "skipunchangedtests"
 OPTION_SKIP_UNCHANGED_TESTS_DEBUG = "skipunchangedtests_debug"
+OPTION_SKIP_FAILED_TESTS = 'skipfailedtests'
 
 
 def pytest_addoption(parser):
@@ -36,13 +37,20 @@ def pytest_addoption(parser):
         help="skip unchanged tests",
     )
 
-    group = parser.getgroup(OPTION_SKIP_UNCHANGED_TESTS_DEBUG)
     group.addoption(
         "--skip-unchanged-tests-debug",
         action="store_true",
         dest=OPTION_SKIP_UNCHANGED_TESTS_DEBUG,
         default=False,
         help="DEBUG FLAG for --skip-unchanged-tests (shows which tests are skipped, etc)",
+    )
+
+    group.addoption(
+        "--skip-previously-failed-tests",
+        action="store_true",
+        dest=OPTION_SKIP_FAILED_TESTS,
+        default=False,
+        help="Skip previously failed tests"
     )
 
 
@@ -63,7 +71,11 @@ def pytest_cmdline_main(config):
     test_oracle_save_path = path.join(config._rootpath, '__unaffected_tests_oracle.tmp.json')
 
     unaffected_tests_oracle = UnaffectedTestOracle.load(test_oracle_save_path)
+
     collect_ignore_set = unaffected_tests_oracle.get_list_of_testfiles_to_ignore()
+    if not config.getoption(OPTION_SKIP_FAILED_TESTS):
+        collect_ignore_set.difference_update(unaffected_tests_oracle.prev_state.failing_tests)
+
     if config.getoption(OPTION_SKIP_UNCHANGED_TESTS_DEBUG):
         print("collect_ignore: ", collect_ignore_set)
         print(
